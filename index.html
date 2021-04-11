@@ -1,0 +1,131 @@
+<html ng-app="app">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/underscore@1.12.0/underscore-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.0.0/js-yaml.min.js"></script>
+    <script>
+      window.app = window.angular
+        .module("app", [])
+        .run(function ($rootScope, $http, $q) {
+          $rootScope.pedestrians = [];
+          loadYAMLFile("sign/pedestrians.yml", function (data) {
+            $rootScope.max_width = 1000;
+            _.each(data.countries, function (v) {
+              $rootScope.pedestrians.push(v);
+            });
+            setTimeout(function () {
+              var x = 0;
+              var y = 0;
+              var i = 0;
+              var max_height = 0;
+
+              eachPic(document.getElementById("images").childNodes, function (
+                e,
+                width,
+                height
+              ) {
+                preIncrXY(width, height);
+                incrXY(width, height);
+              });
+
+              $rootScope.height = y + max_height;
+              $rootScope.$apply();
+
+              x = y = max_height = 0;
+              var tiles = {};
+              var canvas2d = document.getElementById("canvas").getContext("2d");
+
+              eachPic(document.getElementById("images").childNodes, function (
+                e,
+                width,
+                height
+              ) {
+                preIncrXY(width, height);
+                canvas2d.drawImage(e, x, y, width, height);
+                incrXY(width, height);
+                tiles[e.getAttribute("src")] = [i++, x, y, width, height];
+              });
+
+              $rootScope.pedestrians = null;
+              $rootScope.$apply();
+
+              return;
+
+              console.log(JSON.stringify(tiles));
+              var output = "";
+              _.each(tiles, function (v, k) {
+                output += k + ": [" + v.join(",") + "]" + "\n";
+              });
+              console.log(output + "\n\n");
+
+              function preIncrXY(width, height) {
+                if (x + width >= $rootScope.max_width) {
+                  x = 0;
+                  y += max_height;
+                  max_height = height;
+                }
+              }
+              function incrXY(width, height) {
+                x += width;
+                max_height = Math.max(max_height, height);
+              }
+            }, 5000);
+          });
+
+          function eachPic(items, fn) {
+            _.each(items, function (e) {
+              var bbox;
+              if (e.nodeName === "IMG") {
+                bbox = e;
+              } else {
+                return;
+              }
+              try {
+                if (fn) {
+                  var ratio = 128 / Math.max(bbox.width, bbox.height);
+                  fn(
+                    e,
+                    Math.ceil(bbox.width * ratio),
+                    Math.ceil(bbox.height * ratio)
+                  );
+                }
+              } catch (err) {
+                console.error(err);
+              }
+            });
+          }
+
+          function loadYAMLFile(url, callback, complete) {
+            $http.get(url).then(function (response) {
+              try {
+                callback(window.jsyaml.load(response.data), response);
+              } catch (err) {
+                console.error(err);
+                errors.push({ error: err, response: response });
+              }
+              if (complete) {
+                complete(response);
+              }
+            });
+          }
+        });
+    </script>
+  </head>
+  <body>
+    <div ng-repeat="item in errors" class="error">
+      Error in file: {{ item.response.config.url }}
+      <pre>{{ item.error }}</pre>
+    </div>
+    <canvas id="canvas" width="{{max_width}}" height="{{height}}">
+      Désolé, votre navigateur ne prend pas en charge &lt;canvas&gt;.
+    </canvas>
+    <hr />
+    <div id="images" ng-show="false">
+      <img
+        ng-repeat="e in pedestrians"
+        ng-src="{{ e.image2 || ( 'images/' + e.image ) }}"
+      />
+    </div>
+  </body>
+</html>
